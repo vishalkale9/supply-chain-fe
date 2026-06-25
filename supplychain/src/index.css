@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+@theme {
+  /* This tells Tailwind to use Inter as the default font everywhere */
+  --font-sans: "Inter", system-ui, sans-serif;
+}
