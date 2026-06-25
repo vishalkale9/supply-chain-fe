@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { NAV_LINKS } from "../constants/navLinks";
 import Button from "../components/Button";
 
@@ -6,8 +7,10 @@ const Navbar = () => {
   // State to handle mobile menu toggle
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  const navigate = useNavigate();
+
   const handleLoginClick = () => {
-    console.log("Login clicked!");
+    navigate("/login");
   };
 
   const toggleMobileMenu = () => {
@@ -20,9 +23,11 @@ const Navbar = () => {
         <div className="flex justify-between items-center h-16">
           {/* Logo Section */}
           <div className="flex-shrink-0 flex items-center cursor-pointer">
-            <span className="text-2xl font-bold text-blue-600">
-              SupplyChain
-            </span>
+            <Link to="/">
+              <span className="text-2xl font-bold text-blue-600">
+                SupplyChain
+              </span>
+            </Link>
           </div>
 
           {/* Desktop Center Links */}
