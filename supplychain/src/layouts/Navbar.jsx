@@ -1,70 +1,59 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { NAV_LINKS } from "../constants/navLinks";
-import Button from "../components/Button";
 
 const Navbar = () => {
-  // State to handle mobile menu toggle
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  const navigate = useNavigate();
-
-  const handleLoginClick = () => {
-    navigate("/login");
-  };
-
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <nav className="fixed top-0 w-full bg-white shadow-sm z-50">
+    <nav className="bg-white border-b border-gray-200 relative z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo Section */}
+          {/* Logo */}
           <div className="flex-shrink-0 flex items-center cursor-pointer">
-            <Link to="/">
-              <span className="text-2xl font-bold text-blue-600">
-                SupplyChain
-              </span>
-            </Link>
+            <span className="font-bold text-xl text-blue-600">SupplyChain</span>
           </div>
 
-          {/* Desktop Center Links */}
+          {/* Desktop Navigation Links */}
           <div className="hidden md:flex space-x-8">
-            {NAV_LINKS.map((link) => (
-              <a
-                key={link.id}
-                href={link.path}
-                className="text-gray-600 hover:text-blue-600 font-medium transition-colors"
-              >
-                {link.label}
-              </a>
-            ))}
-          </div>
-
-          {/* Desktop Right Action Button */}
-          <div className="hidden md:flex items-center">
-            <Button variant="primary" onClick={handleLoginClick}>
-              Login
-            </Button>
-          </div>
-
-          {/* Mobile Hamburger Button */}
-          <div className="flex md:hidden items-center">
-            <button
-              onClick={toggleMobileMenu}
-              className="text-gray-600 hover:text-blue-600 focus:outline-none"
+            <a
+              href="#"
+              className="text-gray-700 hover:text-blue-600 font-medium px-3 py-2 text-sm transition-colors"
             >
-              {/* Hamburger Icon (SVG) */}
+              Home
+            </a>
+            <a
+              href="#"
+              className="text-gray-700 hover:text-blue-600 font-medium px-3 py-2 text-sm transition-colors"
+            >
+              Market
+            </a>
+            <a
+              href="#"
+              className="text-gray-700 hover:text-blue-600 font-medium px-3 py-2 text-sm transition-colors"
+            >
+              Services
+            </a>
+          </div>
+
+          {/* Desktop Login Button */}
+          <div className="hidden md:flex items-center">
+            <button className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-5 rounded text-sm transition-colors">
+              Login
+            </button>
+          </div>
+
+          {/* Mobile Menu Button */}
+          <div className="md:hidden flex items-center">
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="text-gray-500 hover:text-gray-700 focus:outline-none p-2"
+            >
               <svg
-                className="h-7 w-7"
+                className="h-6 w-6"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
               >
-                {isMobileMenuOpen ? (
-                  // 'X' icon when open
+                {isOpen ? (
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -72,7 +61,6 @@ const Navbar = () => {
                     d="M6 18L18 6M6 6l12 12"
                   />
                 ) : (
-                  // Hamburger lines when closed
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -86,26 +74,32 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* Mobile Menu Dropdown (Accordion style) */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden bg-white border-t border-gray-100 shadow-lg absolute w-full">
-          <div className="px-4 pt-2 pb-6 space-y-2">
-            {NAV_LINKS.map((link) => (
-              <a
-                key={link.id}
-                href={link.path}
-                onClick={() => setIsMobileMenuOpen(false)} // Close menu on click
-                className="block px-3 py-3 text-base font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 border-b border-gray-100"
-              >
-                {link.label}
-              </a>
-            ))}
-
-            {/* Mobile Login Button */}
-            <div className="pt-4 px-3">
-              <Button variant="primary" onClick={handleLoginClick}>
-                Login to Portal
-              </Button>
+      {/* Mobile Menu */}
+      {isOpen && (
+        <div className="md:hidden bg-white border-b border-gray-200 absolute w-full left-0 top-16 shadow-lg">
+          <div className="px-2 pt-2 pb-4 space-y-1">
+            <a
+              href="#"
+              className="block text-gray-700 hover:text-blue-600 hover:bg-blue-50 font-medium px-3 py-2 rounded-md transition-colors"
+            >
+              Home
+            </a>
+            <a
+              href="#"
+              className="block text-gray-700 hover:text-blue-600 hover:bg-blue-50 font-medium px-3 py-2 rounded-md transition-colors"
+            >
+              Market
+            </a>
+            <a
+              href="#"
+              className="block text-gray-700 hover:text-blue-600 hover:bg-blue-50 font-medium px-3 py-2 rounded-md transition-colors"
+            >
+              Services
+            </a>
+            <div className="pt-2">
+              <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-5 rounded text-sm transition-colors">
+                Login
+              </button>
             </div>
           </div>
         </div>

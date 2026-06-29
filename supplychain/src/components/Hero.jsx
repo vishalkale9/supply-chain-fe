@@ -5,7 +5,7 @@ import warehouseAnimation from "../assets/warehouse.json";
 
 const Hero = () => {
   return (
-    <section id="home" className="pt-24 pb-12 md:pt-32 md:pb-24 bg-gray-50">
+    <section id="home" className="pt-8 pb-12 md:pt-16 md:pb-24 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
           {/* Left Column: Text & CTAs */}
