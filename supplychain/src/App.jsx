@@ -6,6 +6,7 @@ import Signup from "./pages/Signup";
 import ProtectedRoute from "./components/ProtectedRoute";
 import SupplierDashboard from "./pages/SupplierDashboard";
 import TransporterDashboard from "./pages/TransporterDashboard";
+import WarehouseDashboard from "./pages/WarehouseDashboard";
 
 const App = () => {
   return (
@@ -42,6 +43,19 @@ const App = () => {
               <Route
                 path="/transporter-dashboard"
                 element={<TransporterDashboard />}
+              />
+            </Route>
+
+            <Route
+              element={
+                <ProtectedRoute
+                  allowedRoles={["WarehouseManager", "SuperAdmin"]}
+                />
+              }
+            >
+              <Route
+                path="/warehouse-dashboard"
+                element={<WarehouseDashboard />}
               />
             </Route>
           </Routes>
