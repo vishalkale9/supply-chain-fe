@@ -8,6 +8,7 @@ import {
   getSupplierOrders,
   updateOrderStatus,
 } from "../services/order.service";
+import { getUsersByRole } from "../services/user.service";
 
 const SupplierDashboard = () => {
   const [activeTab, setActiveTab] = useState("inventory");
@@ -37,6 +38,9 @@ const SupplierDashboard = () => {
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [updatingOrderId, setUpdatingOrderId] = useState(null);
 
+  // State for Transporters Dropdown
+  const [transporters, setTransporters] = useState([]);
+
   useEffect(() => {
     if (activeTab === "inventory") {
       fetchInventory();
@@ -55,7 +59,7 @@ const SupplierDashboard = () => {
     } finally {
       setInventoryLoading(false);
     }
-  };
+  }
 
   async function fetchOrders() {
     setOrdersLoading(true);
@@ -67,7 +71,7 @@ const SupplierDashboard = () => {
     } finally {
       setOrdersLoading(false);
     }
-  };
+  }
 
   const handleAddProduct = async (e) => {
     e.preventDefault();
@@ -87,24 +91,39 @@ const SupplierDashboard = () => {
     }
   };
 
-  const openTransferModal = (product) => {
+  const openTransferModal = async (product) => {
     setSelectedProduct(product);
-    setTransferData({ newOwnerId: "", statusUpdate: "In Transit" });
+    setTransferData({ newOwnerId: "" }); // removed statusUpdate from state as it's hardcoded
     setTransferModalOpen(true);
+
+    // Fetch transporters if we haven't already
+    if (transporters.length === 0) {
+      try {
+        const fetchedTransporters = await getUsersByRole("Transporter");
+        setTransporters(fetchedTransporters);
+      } catch (error) {
+        console.error("Failed to fetch transporters", error);
+      }
+    }
   };
 
   const handleTransfer = async (e) => {
     e.preventDefault();
+    if (!transferData.newOwnerId) {
+      alert("⚠️ Please select a Transporter!");
+      return;
+    }
+
     setIsTransferring(true);
     try {
       await transferProduct({
         productId: selectedProduct._id || selectedProduct.id,
         newOwnerId: transferData.newOwnerId,
-        statusUpdate: transferData.statusUpdate,
+        statusUpdate: "In Transit", // hardcoded as per business logic
       });
       setTransferModalOpen(false);
       fetchInventory(); // Refresh inventory after transfer
-      alert("Product transferred successfully!");
+      alert("Product transferred successfully to Transporter!");
     } catch (error) {
       alert("Error transferring product: " + (error.message || error));
     } finally {
@@ -465,7 +484,7 @@ const SupplierDashboard = () => {
             </span>
 
             {/* Modal Panel */}
-            <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full border border-gray-200">
+            <div className="relative z-10 inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full border border-gray-200">
               <form onSubmit={handleTransfer}>
                 <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                   <h3 className="text-xl leading-6 font-bold text-gray-900 mb-4">
@@ -485,11 +504,9 @@ const SupplierDashboard = () => {
                   <div className="space-y-4 mt-2">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        New Owner ID (Transporter/Warehouse)
+                        Select Logistics Partner (Transporter)
                       </label>
-                      <input
-                        type="text"
-                        required
+                      <select
                         value={transferData.newOwnerId}
                         onChange={(e) =>
                           setTransferData({
@@ -497,30 +514,19 @@ const SupplierDashboard = () => {
                             newOwnerId: e.target.value,
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm"
-                        placeholder="Paste exact user ID..."
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Status Update
-                      </label>
-                      <select
-                        required
-                        value={transferData.statusUpdate}
-                        onChange={(e) =>
-                          setTransferData({
-                            ...transferData,
-                            statusUpdate: e.target.value,
-                          })
-                        }
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm bg-white"
                       >
-                        <option value="In Transit">In Transit</option>
-                        <option value="In Warehouse">In Warehouse</option>
-                        <option value="Delivered">Delivered</option>
+                        <option value="" disabled>
+                          -- Choose a Transporter --
+                        </option>
+                        {transporters.map((t) => (
+                          <option key={t._id} value={t._id}>
+                            {t.name} ({t.email})
+                          </option>
+                        ))}
                       </select>
                     </div>
+                    {/* Status Update dropdown removed. Automatically set to "In Transit" */}
                   </div>
                 </div>
                 <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 sm:px-6 sm:flex sm:flex-row-reverse">
