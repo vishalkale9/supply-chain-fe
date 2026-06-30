@@ -3,12 +3,30 @@ import {
   getMyShipments,
   updateShipmentStatus,
 } from "../services/transport.service.js";
+import {
+  getMyInventory,
+  transferProduct,
+} from "../services/product.service.js";
+import { getUsersByRole } from "../services/user.service.js";
 
 const TransporterDashboard = () => {
-  const [activeTab, setActiveTab] = useState("shipments");
+  const [activeTab, setActiveTab] = useState("inventory");
+
+  // Shipments state
   const [shipments, setShipments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
+
+  // Inventory / Custody state
+  const [inventory, setInventory] = useState([]);
+  const [inventoryLoading, setInventoryLoading] = useState(true);
+
+  // Transfer Modal state
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [transferData, setTransferData] = useState({ newOwnerId: "" });
+  const [isTransferring, setIsTransferring] = useState(false);
+  const [warehouses, setWarehouses] = useState([]);
 
   async function fetchShipments() {
     try {
@@ -19,23 +37,34 @@ const TransporterDashboard = () => {
     }
   }
 
+  async function fetchInventory() {
+    try {
+      const data = await getMyInventory();
+      setInventory(data || []);
+    } catch (error) {
+      console.error("Failed to fetch inventory:", error);
+    }
+  }
+
   useEffect(() => {
-    const loadShipments = async () => {
+    const loadData = async () => {
       if (activeTab === "shipments") {
         setIsLoading(true);
         await fetchShipments();
         setIsLoading(false);
+      } else if (activeTab === "inventory") {
+        setInventoryLoading(true);
+        await fetchInventory();
+        setInventoryLoading(false);
       }
     };
-    loadShipments();
+    loadData();
   }, [activeTab]);
 
   const handleStatusChange = async (shipmentId, newStatus) => {
     setUpdatingId(shipmentId);
     try {
       await updateShipmentStatus(shipmentId, newStatus);
-      // Optimistically update the UI to avoid a full re-fetch if desired,
-      // but re-fetching is safer to ensure data consistency
       await fetchShipments();
     } catch (error) {
       alert("Error updating shipment status: " + (error.message || error));
@@ -44,17 +73,60 @@ const TransporterDashboard = () => {
     }
   };
 
+  const openTransferModal = async (product) => {
+    setSelectedProduct(product);
+    setTransferData({ newOwnerId: "" });
+    setTransferModalOpen(true);
+
+    // Fetch warehouse managers for dropdown
+    if (warehouses.length === 0) {
+      try {
+        const fetchedWarehouses = await getUsersByRole("WarehouseManager");
+        setWarehouses(fetchedWarehouses);
+      } catch (error) {
+        console.error("Failed to fetch warehouses", error);
+      }
+    }
+  };
+
+  const handleTransfer = async (e) => {
+    e.preventDefault();
+    if (!transferData.newOwnerId) {
+      alert("⚠️ Please select a Warehouse!");
+      return;
+    }
+
+    setIsTransferring(true);
+    try {
+      await transferProduct({
+        productId: selectedProduct._id || selectedProduct.id,
+        newOwnerId: transferData.newOwnerId,
+        statusUpdate: "In Warehouse", // Set status automatically for handoff to warehouse
+      });
+      setTransferModalOpen(false);
+      fetchInventory();
+      alert("Product transferred successfully to Warehouse!");
+    } catch (error) {
+      alert("Error transferring product: " + (error.message || error));
+    } finally {
+      setIsTransferring(false);
+    }
+  };
+
   const getStatusBadgeColor = (status) => {
     switch (status) {
       case "PENDING":
         return "bg-yellow-100 text-yellow-800";
       case "DISPATCHED":
+      case "Manufactured":
         return "bg-blue-100 text-blue-800";
       case "IN_TRANSIT":
+      case "In Transit":
         return "bg-indigo-100 text-indigo-800";
       case "OUT_FOR_DELIVERY":
         return "bg-purple-100 text-purple-800";
       case "DELIVERED":
+      case "In Warehouse":
         return "bg-green-100 text-green-800";
       case "RETURNED":
         return "bg-red-100 text-red-800";
@@ -75,6 +147,30 @@ const TransporterDashboard = () => {
 
         {/* Navigation Links */}
         <nav className="flex-1 px-4 py-4 md:py-0 space-y-2 flex md:flex-col overflow-x-auto md:overflow-x-visible">
+          <button
+            onClick={() => setActiveTab("inventory")}
+            className={`flex-1 md:flex-none flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === "inventory"
+                ? "bg-blue-50 text-blue-700"
+                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            }`}
+          >
+            <svg
+              className="mr-3 h-5 w-5 flex-shrink-0 hidden md:block"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+              />
+            </svg>
+            My Custody
+          </button>
+
           <button
             onClick={() => setActiveTab("shipments")}
             className={`flex-1 md:flex-none flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
@@ -106,13 +202,101 @@ const TransporterDashboard = () => {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
-            Assigned Shipments
+            {activeTab === "inventory"
+              ? "Products in Custody"
+              : "Assigned Shipments"}
           </h1>
           <p className="mt-2 text-sm text-gray-500">
-            View your logistics pipeline and update tracking statuses in
-            real-time.
+            {activeTab === "inventory"
+              ? "View the physical products currently in your possession."
+              : "View your logistics pipeline and update tracking statuses in real-time."}
           </p>
         </div>
+
+        {/* INVENTORY / CUSTODY TAB CONTENT */}
+        {activeTab === "inventory" && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="px-6 py-5 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">
+                Products Queue
+              </h3>
+            </div>
+
+            {inventoryLoading ? (
+              <div className="p-12 text-center text-gray-500">
+                Loading products...
+              </div>
+            ) : inventory.length === 0 ? (
+              <div className="p-12 text-center text-gray-500">
+                <p className="text-lg">
+                  No products currently in your custody.
+                </p>
+                <p className="text-sm mt-2">
+                  Suppliers will transfer products to you when they are ready.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Product / Batch
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Quantity
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Action
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {inventory.map((item, idx) => (
+                      <tr
+                        key={idx}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-bold text-gray-900">
+                            {item.name}
+                          </div>
+                          <div className="text-xs text-gray-500 font-mono mt-1">
+                            Batch: {item.batchId}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {item.quantity} units
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeColor(
+                              item.history?.[item.history.length - 1]?.status,
+                            )}`}
+                          >
+                            {item.history?.[item.history.length - 1]?.status ||
+                              "Unknown"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            onClick={() => openTransferModal(item)}
+                            className="text-blue-600 hover:text-blue-900 font-medium bg-blue-50 px-3 py-1 rounded-md"
+                          >
+                            Transfer to Warehouse
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* SHIPMENTS TAB CONTENT */}
         {activeTab === "shipments" && (
@@ -125,33 +309,13 @@ const TransporterDashboard = () => {
 
             {isLoading ? (
               <div className="p-12 text-center text-gray-500">
-                <svg
-                  className="animate-spin h-8 w-8 mx-auto text-blue-600 mb-4"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
                 Loading shipments...
               </div>
             ) : shipments.length === 0 ? (
               <div className="p-12 text-center text-gray-500">
                 <p className="text-lg">No active shipments assigned to you.</p>
                 <p className="text-sm mt-2">
-                  Wait for a supplier or warehouse to transfer custody.
+                  Wait for an admin or warehouse to create a shipping manifest.
                 </p>
               </div>
             ) : (
@@ -252,6 +416,89 @@ const TransporterDashboard = () => {
           </div>
         )}
       </main>
+
+      {/* TRANSFER MODAL */}
+      {transferModalOpen && selectedProduct && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            {/* Background overlay */}
+            <div
+              className="fixed inset-0 transition-opacity"
+              onClick={() => setTransferModalOpen(false)}
+            >
+              <div className="absolute inset-0 bg-gray-900 opacity-50 backdrop-blur-sm"></div>
+            </div>
+
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen">
+              &#8203;
+            </span>
+
+            {/* Modal Panel */}
+            <div className="relative z-10 inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full border border-gray-200">
+              <form onSubmit={handleTransfer}>
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <h3 className="text-xl leading-6 font-bold text-gray-900 mb-4">
+                    Transfer to Warehouse
+                  </h3>
+                  <div className="bg-blue-50 p-3 rounded-md mb-4 border border-blue-100">
+                    <p className="text-sm text-blue-800">
+                      You are transferring custody of{" "}
+                      <strong>{selectedProduct.name}</strong> (Batch:{" "}
+                      <span className="font-mono">
+                        {selectedProduct.batchId}
+                      </span>
+                      ) to a destination warehouse.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4 mt-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Select Destination Warehouse
+                      </label>
+                      <select
+                        value={transferData.newOwnerId}
+                        onChange={(e) =>
+                          setTransferData({
+                            ...transferData,
+                            newOwnerId: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm bg-white"
+                      >
+                        <option value="" disabled>
+                          -- Choose a Warehouse --
+                        </option>
+                        {warehouses.map((w) => (
+                          <option key={w._id} value={w._id}>
+                            {w.name} ({w.email})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 sm:px-6 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="submit"
+                    disabled={isTransferring}
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
+                  >
+                    {isTransferring ? "Transferring..." : "Confirm Handoff"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTransferModalOpen(false)}
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
